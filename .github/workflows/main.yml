@@ -5,28 +5,11 @@ on:
     tags:
       - 'v*'  # Triggers on version tags like v1.0.0
 
-jobs:
-  test:
+jobs:      
+  release:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v3 #clones repo
-      - name: Run tests
-        run: # tests
-      
-  build-and-release:
-    needs: test  # needs tests to pass
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v3 #clones repo
-      
-      - name: Build documentation
-        run: # docs
-      
-      - name: Compile binaries
-        run: # binaries
       
       - name: Create Release
-        uses: softprops/action-gh-release@v1
-        with:
-          files: #files
-          generate_release_notes: true
+        uses: softprops/action-gh-release@v1 #creates release
