@@ -1,0 +1,67 @@
+name: Auto Integration Testing on FlatSat
+
+on:
+  push:
+    branches:
+      - main
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v2
+
+      - name: Set up python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.13'
+
+      - name: Install dependencies
+        run: pip install fprime-bootstrap  # idk if this is the right way
+
+      - name: Run tests
+        run: test  # idk what tests to put but it was in template
+
+  deploy:
+    needs: test  # needs tests to pass
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v2
+      - name: Setup SSH for Controller Pi
+        run: |
+          mkdir -p ~/.ssh
+          echo "${{ secrets.CONTROLLER_PI_SSH_KEY }}" > ~/.ssh/controller_key
+          chmod 600 ~/.ssh/controller_key
+          ssh-keyscan -H ${{ secrets.CONTROLLER_PI_IP }} >> ~/.ssh/known_hosts
+      
+      - name: Transfer deployment package to Controller Pi
+        run: |
+          ssh -i ~/.ssh/controller_key \
+            ${{ secrets.CONTROLLER_PI_SSH_USERNAME }}@${{ secrets.CONTROLLER_PI_IP }} \
+            "mkdir -p /tmp/fprime-deploy-${{ github.sha }}"
+          
+          scp -i ~/.ssh/controller_key \
+            fprime-deployment.tar.gz \
+            ${{ secrets.CONTROLLER_PI_SSH_USERNAME }}@${{ secrets.CONTROLLER_PI_IP }}:/tmp/fprime-deploy-${{ github.sha }}/
+          
+          scp -i ~/.ssh/controller_key \
+            deployment/deploy_flatsat.py \
+            ${{ secrets.CONTROLLER_PI_SSH_USERNAME }}@${{ secrets.CONTROLLER_PI_IP }}:/tmp/fprime-deploy-${{ github.sha }}/
+      
+      - name: deploy to target Pi
+        run: |
+          ssh -i ~/.ssh/controller_key \
+            ${{ secrets.CONTROLLER_PI_SSH_USERNAME }}@${{ secrets.CONTROLLER_PI_IP }} << 'ENDSSH'
+          cd /tmp/fprime-deploy-${{ github.sha }}
+          tar -xzf fprime-deployment.tar.gz
+          
+          python3 deploy_flatsat.py \
+            --target ${{ secrets.TARGET_PI_IP }} \
+            --user pi \
+            --key ~/.ssh/target_pi_key \
+            --binary ./fprime-app
+          ENDSSH
